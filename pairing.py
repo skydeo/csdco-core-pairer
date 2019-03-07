@@ -1,146 +1,151 @@
-import csv, copy, timeit
-startTime = timeit.default_timer()
+import csv
+import copy
+import timeit
+import argparse
 
-debug = 0
+def pair_cores(input_filename, **kwargs):
+  debug = False
 
-#### Settings
+  max_core_length = 1.5 if 'max_core_length' not in kwargs else kwargs['max_core_length']
+  max_num_cores = 8 if 'max_num_cores' not in kwargs else kwargs['max_num_cores']
+  max_search_depth = 6 if 'max_search_depth' not in kwargs else kwargs['max_search_depth']
+  run-variation = 2 if 'run-variation' not in kwargs else kwargs['run-variation']
+  if output_filename in kwargs:
+    output_filename = kwargs['output_file_name']
+  else:
+    output_filename = ''.join(input_filename.split('.')[:-1]) + '_paired.csv' 
 
-# maxL = Maximum length (in meters) of core material wanted in a D-Tube
+  
+  #### End of user-defined settings.
 
-# mcpt = Maximum cores per tube (regardless of maximum length)
+  # Create some empty arrays
+  mcpts = []
+  mcsds = []
+  valueRanges = []
+  cList = []
+  runs = []
 
-# mcsd = Maximum core search depth
-#		Maximum # of rows down-list to look in order to find a core that fits
+  # Import the core list, right now it must be in same folder and named 'coreList.csv'
+  with open(input_filename, 'r', encoding='utf-8-sig') as f:
+    csv_reader = csv.reader(f, delimiter='\n')
+    for row in csv_reader:
+      cList.append(row[0].split(','))
 
-maxL = 1.5
-mcpt = 8
-mcsd = 8
+  # Add index to coreList. Needed to know how far to search for partner core.
+  for i in range(0,len(cList)):
+    cList[i].append(i)
 
-mcptRange = 2
-mcsdRange = 2
+  for r in range(-run-variation,run-variation+1):
+    mcpts.append(r+max_num_cores)
 
-#### End of user-defined settings.
+  for r in range(-run-variation,run-variation+1):
+    mcsds.append(r+max_search_depth)
 
-# Create some empty arrays
-mcpts = []
-mcsds = []
-valueRanges = []
-cList = []
-runs = []
-
-# Import the core list, right now it must be in same folder and named 'coreList.csv'
-with open('coreList.csv', 'r') as inputFile:
-	fileReader = csv.reader(inputFile, delimiter='\n')
-	for row in fileReader:
-		cList.append(row[0].split(','))
-
-# Remove BOM if it's there
-if '\ufeff' in cList[0][0]:
-	cList[0][0] = cList[0][0].replace('\ufeff','')
-	if debug:
-		print('BOM removed.')
-
-# Add index to coreList. Needed to know how far to search for partner core.
-for i in range(0,len(cList)):
-	cList[i].append(i)
-
-for r in range(-mcptRange,mcptRange+1):
-	mcpts.append(r+mcpt)
-
-for r in range(-mcsdRange,mcsdRange+1):
-	mcsds.append(r+mcsd)
-
-valueRanges = [(x, y) for x in mcpts for y in mcsds]
+  valueRanges = [(x, y) for x in mcpts for y in mcsds]
 
 
-def pair(coreList, mcpt, mcsd):
-	# Set up some emcpty variables
-	dNum = 0
-	pairings = [[]]
-	lengths = [float(0)]
+  def pair(core_list, max_num_cores, max_search_depth):
+    # Set up some empty variables
+    dNum = 0
+    pairings = [[]]
+    lengths = [float(0)]
 
-	# Create a true copy of the coreList object, which will be used as a stack
-	coreStack = copy.deepcopy(coreList)
+    # Create a true copy of the core_list object, which will be used as a stack
+    coreStack = copy.deepcopy(core_list)
 
-	# Pair
-	while (len(coreStack) > 0):
-		cCore = coreStack.pop(0);
+    # Pair
+    while coreStack:
+      cCore = coreStack.pop(0);
 
-		if debug:
-			print('\ncCore: ',cCore,)
+      if debug:
+        print('\ncCore: ',cCore,)
 
-		pairings[dNum].append(cCore[0])
-		lengths[dNum] += float(cCore[1])
+      pairings[dNum].append(cCore[0])
+      lengths[dNum] += float(cCore[1])
 
-		searchSet = []
+      searchSet = []
 
-		i = 0
-		while (i < len(coreStack)):
-			if (coreStack[i][2] <= (cCore[2] + mcsd)):
-				sCore = coreStack[i]
-				searchSet.append(sCore)
-			i += 1
+      i = 0
+      while (i < len(coreStack)):
+        if (coreStack[i][2] <= (cCore[2] + max_search_depth)):
+          sCore = coreStack[i]
+          searchSet.append(sCore)
+        i += 1
 
-		if debug & (len(searchSet) > 0):
-			print('searchSet: ',searchSet)
+      if debug & (len(searchSet) > 0):
+        print('searchSet: ',searchSet)
 
-		fitSet = []
+      fitSet = []
 
-		for sCore in searchSet:
-			if (lengths[dNum] + float(sCore[1]) <= maxL) & (len(pairings[dNum]) < mcpt):
-				lengths[dNum] += float(sCore[1])
-				pairings[dNum].append(sCore[0])
-				fitSet.append(sCore)
+      for sCore in searchSet:
+        if (lengths[dNum] + float(sCore[1]) <= max_core_length) & (len(pairings[dNum]) < max_num_cores):
+          lengths[dNum] += float(sCore[1])
+          pairings[dNum].append(sCore[0])
+          fitSet.append(sCore)
 
-		if debug & (len(fitSet) > 0):
-			print('fitSet:',fitSet)
+      if debug & (len(fitSet) > 0):
+        print('fitSet:',fitSet)
 
-		for fCore in fitSet:
-			coreStack.pop(coreStack.index(fCore))
+      for fCore in fitSet:
+        coreStack.pop(coreStack.index(fCore))
 
-		if len(coreStack) > 0:
-			dNum += 1
-			pairings.append([])
-			lengths.append(float(0))
+      if len(coreStack) > 0:
+        dNum += 1
+        pairings.append([])
+        lengths.append(float(0))
 
-	# Append lengths back on to end of pairing list.
-	for r in range(0,len(pairings)):
-		pairings[r] += [''] * (mcpt - len(pairings[r]))
-		pairings[r].append(str(round(lengths[r],3)))
+    # Append lengths back on to end of pairing list.
+    for r in range(0,len(pairings)):
+      pairings[r] += [''] * (max_num_cores - len(pairings[r]))
+      pairings[r].append(str(round(lengths[r],3)))
 
-	return pairings
+    return pairings
 
-# Run through all mcpts
-for valueSet in valueRanges:
-	pairings = pair(cList, valueSet[0], valueSet[1])
-	runs.append((valueSet[0],valueSet[1],len(pairings)))
-	# if debug:
-	print('{0} D-Tubes used (per half) with {1} cores per tube and a search depth of {2}.'.format(len(pairings),valueSet[0],valueSet[1]))
+  # Run through all mcpts
+  for valueSet in valueRanges:
+    pairings = pair(cList, valueSet[0], valueSet[1])
+    runs.append((valueSet[0],valueSet[1],len(pairings)))
+    # if debug:
+    print(f'{len(pairings)} D-Tubes used (per half) with {valueSet[0]} cores per tube and a search depth of {valueSet[1]}.')
 
-# Sort runs by D-Tube usage
-runs.sort(key=lambda tup: tup[2])
+  # Sort runs by D-Tube usage
+  runs.sort(key=lambda tup: tup[2])
 
-print('\nMinimum D-Tube usage ({0}, per half) found using {1} cores per tube and a search depth of {2}.\n'.format(runs[0][2],runs[0][0],runs[0][1]))
+  print(f'\nMinimum D-Tube usage ({runs[0][2]}, per half) found using {runs[0][0]} cores per tube and a search depth of {runs[0][1]}.\n')
 
-if (len(runs) > 1):
-	# Run minimum valueSet again for export
-	pairings = pair(cList,runs[0][0],runs[0][1])
+  if (len(runs) > 1):
+    # Run minimum valueSet again for export
+    pairings = pair(cList,runs[0][0],runs[0][1])
 
-# Append '-W' once, write those, replace it with '-A', write that.
-with open('pairedDTubes.csv', 'w') as saveFile:
-	filewriter = csv.writer(saveFile)
-	for row in pairings:
-		for el in range(0,len(row)-1):
-			if row[el] != '':
-				row[el] += '-W'
-		filewriter.writerow(row)
-	for row in pairings:
-		for el in range(0,len(row)-1):
-			if row[el] != '':
-				row[el] = row[el][:-2] + '-A'
-		filewriter.writerow(row)
+  # Append '-W' once, write those, replace it with '-A', write that.
+  with open('pairedDTubes.csv', 'w') as f:
+    csv_writer = csv.writer(f)
+    for row in pairings:
+      for el in range(0,len(row)-1):
+        if row[el] != '':
+          row[el] += '-W'
+      csv_writer.writerow(row)
+    for row in pairings:
+      for el in range(0,len(row)-1):
+        if row[el] != '':
+          row[el] = row[el][:-2] + '-A'
+      csv_writer.writerow(row)
 
-endTime = timeit.default_timer()
 
-print('{0} total cores paired into {1} total D-Tubes.\n'.format(str(len(cList)*2),str(len(pairings)*2)))
-print('Completed in {0} seconds.'.format(round((endTime - startTime),3)))
+  print(f'{str(len(cList)*2)} total cores paired into {str(len(pairings)*2)} total D-Tubes.\n')
+
+
+if __name__ == "__main__":
+  parser = argparse.ArgumentParser(description='Automatically pair cores into the minimum number of D-tubes possible.')
+  parser.add_argument('core_list', type=str, help='Name of core list csv file.')
+  parser.add_argument('-o', '--output-file-name', type=str, help='Filename for export.')
+  parser.add_argument('-ml', '--max-core-length', type=float, help='Maximum length of core material to fit in one D-tube.')
+  parser.add_argument('-msd', '--max-search-depth', type=int, help='Maximum distance down-list to search for a core that fits.')
+  parser.add_argument('-mc', '--max-num-cores', type=int, help='Maximum number of cores to fit in one D-tube.')
+  parser.add_argument('-rv', '--run-variation', type=int, help='Integer to vary --max-search-depth and --max-num-cores by.')
+  args = parser.parse_args()
+
+  start_time = timeit.default_timer()
+  pair_cores(args.core_list, **vars(args))
+  print(f'Completed in {round((timeit.default_timer() - start_time),2)} seconds.')
+
