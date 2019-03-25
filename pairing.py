@@ -6,18 +6,17 @@ import argparse
 def pair_cores(input_filename, **kwargs):
   debug = False
 
-  max_core_length = 1.5 if 'max_core_length' not in kwargs else kwargs['max_core_length']
-  max_num_cores = 8 if 'max_num_cores' not in kwargs else kwargs['max_num_cores']
-  max_search_depth = 6 if 'max_search_depth' not in kwargs else kwargs['max_search_depth']
-  run-variation = 2 if 'run-variation' not in kwargs else kwargs['run-variation']
-  if output_filename in kwargs:
-    output_filename = kwargs['output_file_name']
-  else:
-    output_filename = ''.join(input_filename.split('.')[:-1]) + '_paired.csv' 
+  max_core_length = 1.5 if kwargs['max_core_length'] is None else kwargs['max_core_length']
+  max_num_cores = 8 if kwargs['max_num_cores'] is None else kwargs['max_num_cores']
+  max_search_depth = 6 if kwargs['max_search_depth'] is None else kwargs['max_search_depth']
+  run_variation = 2 if kwargs['run_variation'] is None else kwargs['run_variation']
+
+  # if output_filename in kwargs:
+  #   output_filename = kwargs['output_filename']
+  # else:
+  output_filename = ''.join(input_filename.split('.')[:-1]) + '_paired.csv' 
 
   
-  #### End of user-defined settings.
-
   # Create some empty arrays
   mcpts = []
   mcsds = []
@@ -35,10 +34,10 @@ def pair_cores(input_filename, **kwargs):
   for i in range(0,len(cList)):
     cList[i].append(i)
 
-  for r in range(-run-variation,run-variation+1):
+  for r in range(-1*run_variation,run_variation+1):
     mcpts.append(r+max_num_cores)
 
-  for r in range(-run-variation,run-variation+1):
+  for r in range(-run_variation,run_variation+1):
     mcsds.append(r+max_search_depth)
 
   valueRanges = [(x, y) for x in mcpts for y in mcsds]
@@ -118,7 +117,7 @@ def pair_cores(input_filename, **kwargs):
     pairings = pair(cList,runs[0][0],runs[0][1])
 
   # Append '-W' once, write those, replace it with '-A', write that.
-  with open('pairedDTubes.csv', 'w') as f:
+  with open(output_filename, 'w', encoding='utf-8-sig') as f:
     csv_writer = csv.writer(f)
     for row in pairings:
       for el in range(0,len(row)-1):
@@ -138,7 +137,7 @@ def pair_cores(input_filename, **kwargs):
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description='Automatically pair cores into the minimum number of D-tubes possible.')
   parser.add_argument('core_list', type=str, help='Name of core list csv file.')
-  parser.add_argument('-o', '--output-file-name', type=str, help='Filename for export.')
+  parser.add_argument('-o', '--output-filename', type=str, help='Filename for export.')
   parser.add_argument('-ml', '--max-core-length', type=float, help='Maximum length of core material to fit in one D-tube.')
   parser.add_argument('-msd', '--max-search-depth', type=int, help='Maximum distance down-list to search for a core that fits.')
   parser.add_argument('-mc', '--max-num-cores', type=int, help='Maximum number of cores to fit in one D-tube.')
