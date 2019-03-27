@@ -37,7 +37,7 @@ def pair_cores(input_filename, **kwargs):
   for r in range(-1*run_variation,run_variation+1):
     mcpts.append(r+max_num_cores)
 
-  for r in range(-run_variation,run_variation+1):
+  for r in range(-1*run_variation,run_variation+1):
     mcsds.append(r+max_search_depth)
 
   valueRanges = [(x, y) for x in mcpts for y in mcsds]
